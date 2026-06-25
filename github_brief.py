@@ -73,7 +73,7 @@ def get_market():
 # ENRICHED DATA (Calendar + IBKR from local_enricher.py)
 
 def load_enriched():
-    """Load enriched_data.json if it was pushed today (within 4 hours)."""
+    """Load enriched_data.json if it was pushed on the same calendar day (Israel time)."""
     try:
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "enriched_data.json")
         if not os.path.exists(path):
@@ -81,12 +81,12 @@ def load_enriched():
             return None
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
-        ts  = datetime.fromisoformat(data["timestamp"])
-        age = now - ts
-        if age > timedelta(hours=4):
-            print(f"[enriched] File is stale ({age}), skipping")
+        ts    = datetime.fromisoformat(data["timestamp"])
+        ts_il = ts.astimezone(TZ_IL)
+        if ts_il.date() != now.date():
+            print(f"[enriched] File is from {ts_il.date()}, today is {now.date()}, skipping")
             return None
-        print(f"[enriched] Loaded (age: {age})")
+        print(f"[enriched] Loaded (timestamp: {ts_il.strftime('%H:%M')})")
         return data
     except Exception as e:
         print(f"[enriched] Error: {e}")
