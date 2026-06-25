@@ -93,6 +93,93 @@ def load_enriched():
         return None
 
 
+
+
+# ─── CLOUD CALENDAR (Google Service Account) ──────────────────────────────────
+
+def get_calendar_cloud():
+    """Fetch today's events via Google Service Account (no local machine needed)."""
+    try:
+        import json as _json
+        sa_str = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "")
+        if not sa_str:
+            print("[calendar_cloud] GOOGLE_SERVICE_ACCOUNT_JSON not set")
+            return None
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+        sa_info = _json.loads(sa_str)
+        creds   = service_account.Credentials.from_service_account_info(
+            sa_info, scopes=["https://www.googleapis.com/auth/calendar.readonly"])
+        svc    = build("calendar", "v3", credentials=creds)
+        cal_id = os.environ.get("GOOGLE_CALENDAR_ID", "reefbasharti@gmail.com")
+        t_min  = now.replace(hour=0,  minute=0,  second=0,  microsecond=0).isoformat()
+        t_max  = now.replace(hour=23, minute=59, second=59, microsecond=0).isoformat()
+        res    = svc.events().list(
+            calendarId=cal_id, timeMin=t_min, timeMax=t_max,
+            singleEvents=True, orderBy="startTime").execute()
+        events = []
+        for e in res.get("items", []):
+            st = e.get("start", {})
+            if "dateTime" in st:
+                dt = datetime.fromisoformat(st["dateTime"])
+                t  = dt.astimezone(TZ_IL).strftime("%H:%M")
+            else:
+                t = "\u05db\u05dc \u05d4\u05d9\u05d5\u05dd"
+            events.append({"title": e.get("summary", "\u05d0\u05d9\u05e8\u05d5\u05e2"), "time": t})
+        print(f"[calendar_cloud] {len(events)} events")
+        return events
+    except Exception as ex:
+        print(f"[calendar_cloud] Error: {ex}")
+        return None
+
+
+# ─── CLOUD IBKR (Flex Query — end-of-day, no IB Gateway) ─────────────────────
+
+def get_ibkr_flex():
+    """Fetch end-of-day portfolio via IBKR Flex Query (no IB Gateway needed)."""
+    try:
+        import xml.etree.ElementTree as ET
+        import time as _t
+        ft  = os.environ.get("IBKR_FLEX_TOKEN", "")
+        fqid = os.environ.get("IBKR_FLEX_QUERY_ID", "")
+        if not ft or not fqid:
+            print("[ibkr_flex] Secrets not set")
+            return None
+        base = "https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService"
+        r1   = requests.get(f"{base}.SendRequest?t={ft}&q={fqid}&v=3", timeout=30)
+        rt1  = ET.fromstring(r1.text)
+        if rt1.findtext("Status") != "Success":
+            print(f"[ibkr_flex] SendRequest failed: {r1.text[:150]}")
+            return None
+        ref  = rt1.findtext("ReferenceCode")
+        _t.sleep(5)
+        r2   = requests.get(f"{base}.GetStatement?t={ft}&q={ref}&v=3", timeout=30)
+        rt2  = ET.fromstring(r2.text)
+        eq   = rt2.find(".//EquitySummaryInBase")
+        net_liq = float(eq.get("total", 0)) if eq is not None else 0.0
+        cn   = rt2.find(".//CashReportCurrency[@currency='BASE_SUMMARY']")
+        cash = float(cn.get("endingCash", 0)) if cn is not None else 0.0
+        positions = []
+        upnl_total = 0.0
+        for p in rt2.findall(".//OpenPosition[@levelOfDetail='SYMBOL']"):
+            upnl = float(p.get("fifoPnlUnrealized", 0))
+            upnl_total += upnl
+            positions.append({
+                "ticker": p.get("symbol",""),
+                "position": int(float(p.get("position",0))),
+                "market_value":  round(float(p.get("positionValue",0)), 2),
+                "market_price":  round(float(p.get("markPrice",0)), 2),
+                "unrealized_pnl": round(upnl, 2),
+                "daily_pnl": None
+            })
+        print(f"[ibkr_flex] {len(positions)} positions, net_liq={net_liq:.2f}")
+        return {"net_liq": round(net_liq,2), "cash": round(cash,2),
+                "unrealized_pnl": round(upnl_total,2), "daily_pnl": None,
+                "positions": positions, "source": "flex (end-of-day)"}
+    except Exception as ex:
+        print(f"[ibkr_flex] Error: {ex}")
+        return None
+
 # BUILD MESSAGE
 
 market   = get_market()
@@ -100,6 +187,12 @@ enriched = load_enriched()
 
 cal_events = (enriched or {}).get("calendar_events")
 ibkr       = (enriched or {}).get("ibkr")
+
+# Cloud fallbacks when computer was off
+if cal_events is None:
+    cal_events = get_calendar_cloud()
+if ibkr is None:
+    ibkr = get_ibkr_flex()
 
 lines = [
     f"\U0001f305 <b>Good morning! {day_name}, {now.strftime('%d/%m/%Y')}</b>",
