@@ -194,71 +194,90 @@ if cal_events is None:
 if ibkr is None:
     ibkr = get_ibkr_flex()
 
+
+def _arrow(val):
+    if val is None: return "\U0001f4ca"
+    return "\U0001f4c8" if val >= 0 else "\U0001f4c9"
+
+def _pct(val):
+    if val is None: return "N/A"
+    sign = "+" if val >= 0 else ""
+    return f"{sign}{val:.2f}%"
+
+def _money(val):
+    """Format as +$1,234.56 — uses concatenation to avoid dollar+brace in f-string."""
+    if val is None: return "N/A"
+    sign = "+" if val >= 0 else "-"
+    return sign + "$" + f"{abs(val):,.2f}"
+
+
+# ── Header ─────────────────────────────────────────────────────────────────────
+
 lines = [
-    f"\U0001f305 <b>Good morning! {day_name}, {now.strftime('%d/%m/%Y')}</b>",
+    f"\U0001f305 \u05d1\u05d5\u05e7\u05e8 \u05d8\u05d5\u05d1! \u05d9\u05d5\u05dd {day_name}, {now.strftime('%d/%m/%Y')}",
     "",
 ]
 
-# Calendar
-lines.append("\U0001f4c5 <b>Today's Calendar:</b>")
+# ── Calendar ───────────────────────────────────────────────────────────────────
+
+lines += ["\U0001f4c5 \u05d9\u05d5\u05de\u05df \u05d2\u05d5\u05d2\u05dc:", ""]
 if cal_events is None:
-    lines.append("\u2022 Not connected (computer was off at 9:05)")
+    lines.append("* \u26a0\ufe0f \u05dc\u05d0 \u05d6\u05de\u05d9\u05df")
 elif len(cal_events) == 0:
-    lines.append("\u2022 No events today")
+    lines.append("* \u05d0\u05d9\u05df \u05d0\u05d9\u05e8\u05d5\u05e2\u05d9\u05dd \u05d4\u05d9\u05d5\u05dd")
 else:
     for ev in cal_events:
         t     = ev.get("time", "")
         title = ev.get("title", "")
-        icon  = "\U0001f553" if t not in ("All day", "") else "\U0001f4cc"
-        lines.append(f"\u2022 {icon} {t} - {title}" if t else f"\u2022 \U0001f4cc {title}")
+        if t and t not in ("\u05db\u05dc \u05d4\u05d9\u05d5\u05dd", ""):
+            lines.append(f"* \u23f1 {t} - {title}")
+        else:
+            lines.append(f"* \U0001f4cc {title}")
 
-# Market
-lines += ["", "\U0001f4c8 <b>Markets:</b>"]
-for sym, d in market.items():
-    if "error" in d:
-        lines.append(f"\u2022 <b>{sym}</b> ({d['label']}) - error")
-    else:
-        week_part = f" | Week: {pct(d['week'])}" if d["week"] is not None else ""
-        lines.append(f"\u2022 <b>{sym}</b> ({d['label']}): ${d['price']} | Day: {pct(d['day'])}{week_part}")
+# ── Portfolio ──────────────────────────────────────────────────────────────────
 
-# IBKR
-lines += ["", "\U0001f4bc <b>IBKR Portfolio:</b>"]
+lines += ["", "\U0001f4c8 \u05ea\u05d9\u05e7 \u05d4\u05e9\u05e7\u05e2\u05d5\u05ea:", ""]
 if ibkr is None:
-    lines.append("\u2022 Not connected (computer was off at 9:05)")
+    lines.append("* \u26a0\ufe0f \u05dc\u05d0 \u05d6\u05de\u05d9\u05df")
 else:
-    net_liq       = ibkr.get("net_liq", 0)
-    cash          = ibkr.get("cash", 0)
-    daily_pnl     = ibkr.get("daily_pnl", 0)
-    unrealized    = ibkr.get("unrealized_pnl", 0)
-    positions     = ibkr.get("positions", [])
+    net_liq    = ibkr.get("net_liq") or 0
+    cash       = ibkr.get("cash") or 0
+    daily_pnl  = ibkr.get("daily_pnl")
+    unrealized = ibkr.get("unrealized_pnl")
+    daily_pct  = (daily_pnl / net_liq * 100) if (daily_pnl is not None and net_liq) else None
 
-    lines.append(f"\U0001f4b0 Total value: <b>${net_liq:,.2f}</b> | Cash: ${cash:,.2f}")
-    lines.append(f"\U0001f4ca Daily: {fmt_usd(daily_pnl)} | Unrealized: {fmt_usd(unrealized)}")
+    liq_str  = "$" + f"{net_liq:,.2f}"
+    cash_str = "$" + f"{cash:,.2f}"
+    lines.append(f"* \U0001f4ca \u05e9\u05d5\u05d5\u05d9 \u05db\u05d5\u05dc\u05dc: <code>{liq_str}</code> (\U0001f4b5 \u05de\u05d6\u05d5\u05de\u05df: <code>{cash_str}</code>)")
+    if daily_pnl is not None:
+        lines.append(f"* {_arrow(daily_pnl)} \u05d9\u05d5\u05de\u05d9: <code>{_money(daily_pnl)}</code>")
+        if daily_pct is not None:
+            lines.append(f"* {_arrow(daily_pct)} \u05d9\u05d5\u05de\u05d9 (%): {_pct(daily_pct)}")
+    if unrealized is not None:
+        lines.append(f"* {_arrow(unrealized)} \u05dc\u05d0 \u05de\u05de\u05d5\u05de\u05e9: <code>{_money(unrealized)}</code>")
 
-    winners = [p for p in positions if p.get("unrealized_pnl", 0) > 0]
-    losers  = [p for p in positions if p.get("unrealized_pnl", 0) <= 0]
+# ── Market ─────────────────────────────────────────────────────────────────────
 
-    if winners:
-        parts = " | ".join(
-            f"<b>{p['ticker']}</b> +${p['unrealized_pnl']:.2f}"
-            for p in winners[:3]
-        )
-        lines.append(f"\U0001f3c6 {parts}")
-    if losers:
-        parts = " | ".join(
-            f"<b>{p['ticker']}</b> -${abs(p['unrealized_pnl']):.2f}"
-            for p in losers[:3]
-        )
-        lines.append(f"\U0001f4c9 {parts}")
+lines += ["", "\U0001f4ca \u05e9\u05d5\u05e7 \u05d4\u05d4\u05d5\u05df:", ""]
+spy = market.get("SPY", {})
+vxx = market.get("VXX", {})
+if "error" not in spy and "price" in spy:
+    lines.append(f"* \U0001f1fa\U0001f1f8 S&P 500: <code>{_pct(spy.get('day'))}</code> (SPY)")
+else:
+    lines.append("* \U0001f1fa\U0001f1f8 S&P 500: \u26a0\ufe0f \u05e9\u05d2\u05d9\u05d0\u05d4")
+if "error" not in vxx and "price" in vxx:
+    lines.append(f"* \U0001f628 VIX: <code>{_pct(vxx.get('day'))}</code> (VXX)")
+else:
+    lines.append("* \U0001f628 VIX: \u26a0\ufe0f \u05e9\u05d2\u05d9\u05d0\u05d4")
 
 lines += [
     "",
-    f"<i>Auto-sent at {now.strftime('%H:%M')} | GitHub Actions \u2601\ufe0f</i>",
+    f"\U0001f916 \u05e0\u05e9\u05dc\u05d7 \u05d0\u05d5\u05d8\u05d5\u05de\u05d8\u05d9\u05ea \u05d1-{now.strftime('%H:%M')} | \u2601\ufe0f GitHub Actions",
 ]
 
 msg = "\n".join(lines)
 
-# SEND
+# ─── SEND ─────────────────────────────────────────────────────────────────────
 
 resp = requests.post(
     f"https://api.telegram.org/bot{TOKEN}/sendMessage",
