@@ -1,27 +1,50 @@
 {
-  "timestamp": "2026-06-19T09:51:53+03:00",
+  "timestamp": "2026-06-25T14:20:00+03:00",
   "calendar_events": [
     {
-      "title": "אופליין",
-      "time": "01:00"
-    },
-    {
-      "title": "לימודי מכללה",
-      "time": "16:00"
+      "title": "אימון 💪",
+      "time": "13:45"
     }
   ],
   "ibkr": {
-    "net_liq": 3378.01,
-    "cash": 857.32,
-    "unrealized_pnl": -6.2,
-    "daily_pnl": -78.71,
+    "net_liq": 3237.82,
+    "cash": 1186.93,
+    "unrealized_pnl": -105.34,
+    "daily_pnl": -29.12,
     "positions": [
-      {"ticker":"SOFI","position":30,"market_value":530.7,"market_price":17.69,"unrealized_pnl":55.55,"daily_pnl":-0.6},
-      {"ticker":"CRWV","position":1,"market_value":116.42,"market_price":116.42,"unrealized_pnl":14.04,"daily_pnl":-0.61},
-      {"ticker":"GOOGL","position":1,"market_value":364.37,"market_price":364.37,"unrealized_pnl":9.1,"daily_pnl":-8.88},
-      {"ticker":"ORCL","position":2,"market_value":368.36,"market_price":184.18,"unrealized_pnl":-0.76,"daily_pnl":-8.3},
-      {"ticker":"META","position":2,"market_value":1140.1,"market_price":570.05,"unrealized_pnl":-84.13,"daily_pnl":-60.32}
+      {
+        "ticker": "SOFI",
+        "position": 30,
+        "market_value": 522.45,
+        "market_price": 17.415,
+        "unrealized_pnl": 47.3,
+        "daily_pnl": 3.15
+      },
+      {
+        "ticker": "CRWV",
+        "position": 1,
+        "market_value": 100.12,
+        "market_price": 100.12,
+        "unrealized_pnl": -2.26,
+        "daily_pnl": -0.76
+      },
+      {
+        "ticker": "GOOGL",
+        "position": 1,
+        "market_value": 341.1,
+        "market_price": 341.1,
+        "unrealized_pnl": -14.17,
+        "daily_pnl": -4.19
+      },
+      {
+        "ticker": "META",
+        "position": 2,
+        "market_value": 1088.02,
+        "market_price": 544.01,
+        "unrealized_pnl": -136.2,
+        "daily_pnl": -27.32
+      }
     ],
-    "source": "portal"
+    "source": "mcp"
   }
 }
